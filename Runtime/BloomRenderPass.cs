@@ -1,36 +1,37 @@
-﻿using System;
-using System.Collections.Generic;
-using UnityEngine;
-using UnityEngine.Rendering;
-using UnityEngine.Rendering.RenderGraphModule;
-using UnityEngine.Rendering.Universal;
-
-namespace PostEffects
+﻿namespace URPFastBloom
 {
+	using System;
+	using System.Collections.Generic;
+	using UnityEngine;
+	using UnityEngine.Rendering;
+	using UnityEngine.Rendering.RenderGraphModule;
+	using UnityEngine.Rendering.Universal;
+	using static RenderTextureUtils;
+
 	public class BloomRenderPass : ScriptableRenderPass, IDisposable
 	{
-		private static readonly int CameraColorTextureId = Shader.PropertyToID("_CameraColorTexture");
-		private RenderTextureDescriptor _bloomTargetDescriptor;
-		private Vector2Int _bloomTargetResolution;
-		private BloomSettings _settings;
-		private Material _rgMaterial;
+		static readonly int s_cameraColorTextureId = Shader.PropertyToID("_CameraColorTexture");
+		RenderTextureDescriptor m_BloomTargetDescriptor;
+		Vector2Int m_BloomTargetResolution;
+		BloomSettings m_Settings;
+		Material m_RgMaterial;
 
 		public void Dispose()
 		{
-			if (_rgMaterial != null)
+			if (m_RgMaterial != null)
 			{
-				CoreUtils.Destroy(_rgMaterial);
-				_rgMaterial = null;
+				CoreUtils.Destroy(m_RgMaterial);
+				m_RgMaterial = null;
 			}
 		}
 
 		public void SetUp(BloomSettings settings)
 		{
-			_settings = settings;
+			m_Settings = settings;
 
-			if (_rgMaterial == null && _settings != null && _settings.Shader != null)
+			if (m_RgMaterial == null && m_Settings != null && m_Settings.shader != null)
 			{
-				_rgMaterial = new Material(_settings.Shader) { hideFlags = HideFlags.HideAndDontSave };
+				m_RgMaterial = new Material(m_Settings.shader) { hideFlags = HideFlags.HideAndDontSave };
 			}
 		}
 
@@ -44,19 +45,20 @@ namespace PostEffects
 			var src = resources.activeColorTexture;
 
 			// Ensure material and settings
-			if (_rgMaterial == null && _settings != null && _settings.Shader != null)
+			if (m_RgMaterial == null && m_Settings != null && m_Settings.shader != null)
 			{
-				_rgMaterial = new Material(_settings.Shader) { hideFlags = HideFlags.HideAndDontSave };
+				m_RgMaterial = new Material(m_Settings.shader) { hideFlags = HideFlags.HideAndDontSave };
 			}
-			if (_rgMaterial == null)
+
+			if (m_RgMaterial == null)
 				return;
 
 			// Compute target descriptors
-			_bloomTargetResolution = RenderTextureUtils.GetScreenResolution(_settings.Resolution);
-			_bloomTargetDescriptor = new RenderTextureDescriptor(
-				_bloomTargetResolution.x,
-				_bloomTargetResolution.y,
-				Ext.argbHalf,
+			m_BloomTargetResolution = GetScreenResolution(m_Settings.resolution);
+			m_BloomTargetDescriptor = new RenderTextureDescriptor(
+				m_BloomTargetResolution.x,
+				m_BloomTargetResolution.y,
+				RenderTextureFormat.ARGBHalf,
 				0,
 				0
 			);
@@ -75,21 +77,21 @@ namespace PostEffects
 			);
 			var bloomTarget = UniversalRenderer.CreateRenderGraphTexture(
 				renderGraph,
-				_bloomTargetDescriptor,
+				m_BloomTargetDescriptor,
 				"_Bloom_Target",
 				false
 			);
 
 			// Build pyramid descriptors and textures
-			var downTextures = new List<TextureHandle>(_settings.Iterations);
-			var sizes = new List<Vector2Int>(_settings.Iterations);
-			for (var i = 0; i < _settings.Iterations; i++)
+			var downTextures = new List<TextureHandle>(m_Settings.iterations);
+			var sizes = new List<Vector2Int>(m_Settings.iterations);
+			for (var i = 0; i < m_Settings.iterations; i++)
 			{
-				var w = _bloomTargetResolution.x >> (i + 1);
-				var h = _bloomTargetResolution.y >> (i + 1);
+				var w = m_BloomTargetResolution.x >> (i + 1);
+				var h = m_BloomTargetResolution.y >> (i + 1);
 				if (w < 2 || h < 2)
 					break;
-				var desc = new RenderTextureDescriptor(w, h, Ext.argbHalf, 0, 0);
+				var desc = new RenderTextureDescriptor(w, h, RenderTextureFormat.ARGBHalf, 0, 0);
 				var tex = UniversalRenderer.CreateRenderGraphTexture(
 					renderGraph,
 					desc,
@@ -110,7 +112,7 @@ namespace PostEffects
 			{
 				passData.src = src;
 				passData.desc = camDesc;
-				passData.material = _rgMaterial;
+				passData.material = m_RgMaterial;
 				passData.pass = -1; // copy
 				builder.UseTexture(src);
 				builder.SetRenderAttachment(tempColor, 0);
@@ -138,12 +140,12 @@ namespace PostEffects
 					passData.src = tempColor;
 					passData.dst = downTextures[0];
 					passData.texelSize = new Vector2(
-						1f / _bloomTargetResolution.x,
-						1f / _bloomTargetResolution.y
+						1f / m_BloomTargetResolution.x,
+						1f / m_BloomTargetResolution.y
 					);
-					passData.threshold = _settings.Threshold;
-					passData.softKnee = _settings.SoftKnee;
-					passData.material = _rgMaterial;
+					passData.threshold = m_Settings.threshold;
+					passData.softKnee = m_Settings.softKnee;
+					passData.material = m_RgMaterial;
 					builder.UseTexture(tempColor);
 					builder.SetRenderAttachment(downTextures[0], 0);
 					builder.AllowPassCulling(false);
@@ -161,7 +163,7 @@ namespace PostEffects
 								data.src,
 								new Vector4(1, 1, 0, 0),
 								data.material,
-								BloomPasses.PrefilterPass
+								BloomPasses.PREFILTER_PASS
 							);
 						}
 					);
@@ -183,7 +185,7 @@ namespace PostEffects
 				{
 					passData.src = srcDown;
 					passData.texelSize = new Vector2(1f / srcSize.x, 1f / srcSize.y);
-					passData.material = _rgMaterial;
+					passData.material = m_RgMaterial;
 					builder.UseTexture(srcDown);
 					builder.SetRenderAttachment(dstDown, 0);
 					builder.AllowPassCulling(false);
@@ -197,7 +199,7 @@ namespace PostEffects
 								data.src,
 								new Vector4(1, 1, 0, 0),
 								data.material,
-								BloomPasses.DownsamplePass
+								BloomPasses.DOWNSAMPLE_PASS
 							);
 						}
 					);
@@ -219,7 +221,7 @@ namespace PostEffects
 				{
 					passData.src = srcUp;
 					passData.texelSize = new Vector2(1f / srcSize.x, 1f / srcSize.y);
-					passData.material = _rgMaterial;
+					passData.material = m_RgMaterial;
 					builder.UseTexture(srcUp);
 					builder.SetRenderAttachment(dstUp, 0);
 					builder.AllowPassCulling(false);
@@ -233,7 +235,7 @@ namespace PostEffects
 								data.src,
 								new Vector4(1, 1, 0, 0),
 								data.material,
-								BloomPasses.UpsamplePass
+								BloomPasses.UPSAMPLE_PASS
 							);
 						}
 					);
@@ -254,8 +256,8 @@ namespace PostEffects
 				{
 					passData.src = last;
 					passData.texelSize = new Vector2(1f / lastSize.x, 1f / lastSize.y);
-					passData.intensity = _settings.Intensity;
-					passData.material = _rgMaterial;
+					passData.intensity = m_Settings.intensity;
+					passData.material = m_RgMaterial;
 					builder.UseTexture(last);
 					builder.SetRenderAttachment(bloomTarget, 0);
 					builder.AllowPassCulling(false);
@@ -270,7 +272,7 @@ namespace PostEffects
 								data.src,
 								new Vector4(1, 1, 0, 0),
 								data.material,
-								BloomPasses.FinalPass
+								BloomPasses.FINAL_PASS
 							);
 						}
 					);
@@ -293,8 +295,8 @@ namespace PostEffects
 			{
 				passDataCombine.source = tempColor;
 				passDataCombine.bloom = bloomTarget;
-				passDataCombine.material = _rgMaterial;
-				passDataCombine.noise = _settings.Noise;
+				passDataCombine.material = m_RgMaterial;
+				passDataCombine.noise = m_Settings.noise;
 				builder.UseTexture(tempColor);
 				builder.UseTexture(bloomTarget);
 				builder.SetRenderAttachment(finalColor, 0);
@@ -306,17 +308,14 @@ namespace PostEffects
 						// Bind via globals where needed; RG requires TextureHandle for bound textures
 						// Noise is a Texture2D so we bind through the material
 						data.material.SetTexture(BloomIds.NoiseTexId, data.noise);
-						data.material.SetVector(
-							BloomIds.NoiseTexScaleId,
-							RenderTextureUtils.GetTextureScreenScale(data.noise)
-						);
+						data.material.SetVector(BloomIds.NoiseTexScaleId, GetTextureScreenScale(data.noise));
 						ctx.cmd.SetGlobalTexture(BloomIds.SourceTexId, data.source);
 						Blitter.BlitTexture(
 							ctx.cmd,
 							data.bloom,
 							new Vector4(1, 1, 0, 0),
 							data.material,
-							BloomPasses.CombinePass
+							BloomPasses.COMBINE_PASS
 						);
 					}
 				);
@@ -345,16 +344,16 @@ namespace PostEffects
 			}
 		}
 
-		private static class BloomPasses
+		static class BloomPasses
 		{
-			public const int PrefilterPass = 0;
-			public const int DownsamplePass = 1;
-			public const int UpsamplePass = 2;
-			public const int FinalPass = 3;
-			public const int CombinePass = 4;
+			public const int PREFILTER_PASS = 0;
+			public const int DOWNSAMPLE_PASS = 1;
+			public const int UPSAMPLE_PASS = 2;
+			public const int FINAL_PASS = 3;
+			public const int COMBINE_PASS = 4;
 		}
 
-		private static class BloomIds
+		static class BloomIds
 		{
 			public static readonly int CurveId = Shader.PropertyToID("_Curve");
 			public static readonly int IntensityId = Shader.PropertyToID("_Intensity");
@@ -365,7 +364,7 @@ namespace PostEffects
 			public static readonly int ThresholdId = Shader.PropertyToID("_Threshold");
 		}
 
-		private class CopyPassData
+		class CopyPassData
 		{
 			public TextureHandle src;
 			public RenderTextureDescriptor desc;
@@ -373,7 +372,7 @@ namespace PostEffects
 			public int pass;
 		}
 
-		private class PrefilterPassData
+		class PrefilterPassData
 		{
 			public TextureHandle src;
 			public TextureHandle dst;
@@ -383,21 +382,21 @@ namespace PostEffects
 			public Material material;
 		}
 
-		private class DownsamplePassData
+		class DownsamplePassData
 		{
 			public TextureHandle src;
 			public Vector2 texelSize;
 			public Material material;
 		}
 
-		private class UpsamplePassData
+		class UpsamplePassData
 		{
 			public TextureHandle src;
 			public Vector2 texelSize;
 			public Material material;
 		}
 
-		private class FinalPassData
+		class FinalPassData
 		{
 			public TextureHandle src;
 			public Vector2 texelSize;
@@ -405,7 +404,7 @@ namespace PostEffects
 			public Material material;
 		}
 
-		private class CombinePassData
+		class CombinePassData
 		{
 			public TextureHandle source;
 			public TextureHandle bloom;

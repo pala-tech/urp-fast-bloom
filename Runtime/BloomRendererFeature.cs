@@ -1,18 +1,22 @@
-﻿using UnityEngine;
-using UnityEngine.Rendering.Universal;
-
-namespace PostEffects
+﻿namespace URPFastBloom
 {
+	using UnityEngine;
+	using UnityEngine.Rendering.Universal;
+
 	public class BloomRendererFeature : ScriptableRendererFeature
 	{
 		[SerializeField]
-		private BloomSettings _settings;
+		BloomSettings settings;
 
-		private BloomRenderPass _pass;
+		BloomRenderPass m_Pass;
 
 		public override void Create()
 		{
-			_pass = new BloomRenderPass
+			settings ??= new();
+#if UNITY_EDITOR
+			settings.AutoDetect();
+#endif
+			m_Pass = new BloomRenderPass
 			{
 				renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing,
 			};
@@ -26,13 +30,13 @@ namespace PostEffects
 			if (renderingData.cameraData.cameraType != CameraType.Game)
 				return;
 
-			_pass.SetUp(_settings);
-			renderer.EnqueuePass(_pass);
+			m_Pass.SetUp(settings);
+			renderer.EnqueuePass(m_Pass);
 		}
 
 		protected override void Dispose(bool disposing)
 		{
-			_pass?.Dispose();
+			m_Pass?.Dispose();
 		}
 	}
 }

@@ -1,5 +1,6 @@
 {
 	"name": "URPFastBloom",
+	"rootNamespace": "URPFastBloom",
 	"references": [
 		"Unity.RenderPipelines.Core.Runtime",
 		"Unity.RenderPipelines.Universal.Runtime"

@@ -1,12 +1,12 @@
-using UnityEngine;
-
-namespace PostEffects
+namespace URPFastBloom
 {
+	using UnityEngine;
+
 	public class RenderTextureUtils
 	{
 		public static bool SupportsRenderToFloatTexture() =>
-			SystemInfo.SupportsRenderTextureFormat(RenderTextureFormat.ARGBFloat) ||
-			SystemInfo.SupportsRenderTextureFormat(RenderTextureFormat.ARGBHalf);
+			SystemInfo.SupportsRenderTextureFormat(RenderTextureFormat.ARGBFloat)
+			|| SystemInfo.SupportsRenderTextureFormat(RenderTextureFormat.ARGBHalf);
 
 		public static RenderTextureFormat GetSupportedFormat(RenderTextureFormat targetFormat)
 		{
@@ -82,7 +82,8 @@ namespace PostEffects
 
 		public static Vector2 GetTextureScreenScale(Texture2D texture)
 		{
-			if (texture == null) return Vector2.one;
+			if (texture == null)
+				return Vector2.one;
 
 			Vector2 scale;
 			scale.x = Screen.width / (float)texture.width;
