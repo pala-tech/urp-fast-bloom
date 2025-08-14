@@ -1,0 +1,10 @@
+{
+	"name": "im.pala.urp-fast-bloom",
+	"displayName": "[PostFX, URP] Fast Bloom",
+	"version": "0.0.1",
+	"unity": "6000.0",
+	"description": "Fast Bloom PostFX implementation",
+	"dependencies": {
+		"com.unity.render-pipelines.universal": "17.3.0"
+	}
+}
